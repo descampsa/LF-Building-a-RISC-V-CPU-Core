@@ -43,10 +43,15 @@
    
    $reset = *reset;
    
-   $next_pc[31:0] = $reset ? 0 : $pc+4;
+   $next_pc[31:0] = 
+      $reset ? 0 :
+      $taken_br ? $br_tgt_pc :
+      $pc+4;
    $pc[31:0] = >>1$next_pc;
    
    `READONLY_MEM($pc, $$instr[31:0]);
+   
+   // instruction decoding
    
    $is_u_instr = $instr[6:2] ==? 5'b0x101;
    $is_i_instr = $instr[6:2] ==? 5'b0000x || $instr[6:2] ==? 5'b001x0 || $instr[6:2] ==? 5'b11001;
@@ -82,12 +87,31 @@
    $is_addi = $dec_bits ==? 11'bx_000_0010011;
    $is_add = $dec_bits ==? 11'b0_000_0110011;
    
+   // ALU
+   $result[31:0] =
+      $is_addi ? $src1_value + $imm :
+      $is_add ? $src1_value + $src2_value :
+      32'b0; 
+   
+   // branch logic
+   
+   $taken_br =
+      $is_beq ? $src1_value == $src2_value :
+      $is_bne ? $src1_value != $src2_value :
+      $is_blt ? ($src1_value < $src2_value) ^ ($src1_value[31] != $src2_value[31]) :
+      $is_bge ? ($src1_value >= $src2_value) ^ ($src1_value[31] != $src2_value[31]) :
+      $is_bltu ? $src1_value < $src2_value :
+      $is_bgeu ? $src1_value >= $src2_value :
+      1'b0;
+   $br_tgt_pc[31:0] = $pc + $imm;
    
    // Assert these to end simulation (before Makerchip cycle limit).
-   *passed = 1'b0;
+   //*passed = 1'b0;
+   m4+tb() 
    *failed = *cyc_cnt > M4_MAX_CYC;
    
-   m4+rf(32, 32, $reset, $wr_en, $wr_index[4:0], $wr_data[31:0], $rs1_valid, $rs1[4:0], $src1_value, $rs2_valid, $rs2[4:0], $src2_value)
+   $write_rd = $rd_valid && ($rd[4:0] != 5'd0); // never write r0
+   m4+rf(32, 32, $reset, $write_rd, $rd[4:0], $result[31:0], $rs1_valid, $rs1[4:0], $src1_value, $rs2_valid, $rs2[4:0], $src2_value)
    //m4+dmem(32, 32, $reset, $addr[4:0], $wr_en, $wr_data[31:0], $rd_en, $rd_data)
    m4+cpu_viz()
 \SV
