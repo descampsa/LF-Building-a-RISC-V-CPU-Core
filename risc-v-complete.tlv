@@ -58,7 +58,7 @@ m4_test_prog()
    $is_lui = $dec_bits ==? 11'bx_xxx_0110111;
    $is_auipc = $dec_bits ==? 11'bx_xxx_0010111;
    $is_jal = $dec_bits ==? 11'bx_xxx_1101111;
-   $is_jalb = $dec_bits ==? 11'bx_000_1100111;
+   $is_jalr = $dec_bits ==? 11'bx_000_1100111;
    $is_beq = $dec_bits ==? 11'bx_000_1100011;
    $is_bne = $dec_bits ==? 11'bx_001_1100011;
    $is_blt = $dec_bits ==? 11'bx_100_1100011;
@@ -72,7 +72,7 @@ m4_test_prog()
    $is_ori = $dec_bits ==? 11'bx_110_0010011;
    $is_andi = $dec_bits ==? 11'bx_111_0010011;
    $is_slli = $dec_bits ==? 11'b0_001_0010011;
-   $is_slri = $dec_bits ==? 11'b0_101_0010011;
+   $is_srli = $dec_bits ==? 11'b0_101_0010011;
    $is_srai = $dec_bits ==? 11'b1_101_0010011;
    $is_add = $dec_bits ==? 11'b0_000_0110011;
    $is_sub = $dec_bits ==? 11'b1_000_0110011;
@@ -88,9 +88,44 @@ m4_test_prog()
   
    
    // ALU
+   // SLTU and SLTI (set if less than, unsigned) results:
+   $sltu_rslt[31:0] = {31'b0, $src1_value < $src2_value};
+   $sltiu_rslt[31:0] = {31'b0, $src1_value < $imm};
+   //SRA and SRAI (shift right, arithmetic) resuls :
+   // sign_extended src1
+   $ext_src1[63:0] = { {32{$src1_value[31]}}, $src1_value };
+   // 64-bit sign-extended results, to be truncated
+   $sra_rslt[63:0] = $ext_src1 >> $src2_value;
+   $srai_rslt[63:0] = $ext_src1 >> $imm[4:0];
+   
    $result[31:0] =
+      $is_andi ? $src1_value & $imm :
+      $is_ori ? $src1_value | $imm :
+      $is_xori ? $src1_value ^ $imm :
       $is_addi ? $src1_value + $imm :
+      $is_slli ? $src1_value << $imm[5:0] :
+      $is_srli ? $src1_value >> $imm[5:0] :
+      $is_and ? $src1_value & $src2_value :
+      $is_or ? $src1_value | $src2_value :
+      $is_xor ? $src1_value ^ $src2_value :
       $is_add ? $src1_value + $src2_value :
+      $is_sub ? $src1_value - $src2_value :
+      $is_sll ? $src1_value << $src2_value[4:0] :
+      $is_srl ? $src1_value >> $src2_value[4:0] :
+      $is_sltu ? $sltu_rslt :
+      $is_sltiu ? $sltiu_rslt :
+      $is_lui ? {$imm[31:12], 12'b0} :
+      $is_auipc ? $pc + $imm :
+      $is_jal ? $pc + 32'd4 :
+      $is_jalr ? $pc + 32'd4 :
+      $is_slt ? ( ($src1_value[31] == $src2_value[31]) ?
+         $sltu_rslt :
+         {31'b0, $src1_value[31]} ) :
+      $is_slti ? ( ($src1_value[31] == $imm[31]) ?
+         $sltiu_rslt :
+         {31'b0, $src1_value[31]} ) :
+      $is_sra ? $sra_rslt[31:0] :
+      $is_srai ? $srai_rslt[31:0] :
       32'b0; 
    
    // branch logic
